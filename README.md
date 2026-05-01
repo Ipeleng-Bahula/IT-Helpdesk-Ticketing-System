@@ -25,7 +25,7 @@ A full-stack web application for managing IT support tickets. Built to help smal
 1. Clone: `git clone https://github.com/yourusername/it-helpdesk-ticketing-system.git`
 2. Create PostgreSQL DB: `CREATE DATABASE helpdesk_db;`
 3. Update `src/main/resources/application.properties` with your DB credentials
-4. Run: `.\gradlew.bat bootRun`
+4. Run: `mvn spring-boot:run`
 5. Visit: `http://localhost:8082`
 
 ### **Roadmap**
