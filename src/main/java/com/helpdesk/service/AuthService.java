@@ -20,7 +20,7 @@ public class AuthService {
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
 
-    public String register(RegisterRequest req) {
+    public java.util.Map<String, String> register(RegisterRequest req) {
         if (userRepo.existsByUsername(req.getUsername()))
             throw new RuntimeException("Username already taken");
         if (userRepo.existsByEmail(req.getEmail()))
@@ -32,16 +32,22 @@ public class AuthService {
                 .password(encoder.encode(req.getPassword()))
                 .build();
         userRepo.save(user);
-        return "User registered successfully";
+        return java.util.Map.of("message", "User registered successfully");
     }
 
     public JwtResponse login(LoginRequest req) {
+        User user = userRepo.findByEmail(req.getEmail())
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        // Authenticate against the underlying username-based UserDetailsService —
+        // this keeps every other part of the app (JWT subject, @AuthenticationPrincipal
+        // lookups in TicketService/CommentController, etc.) unchanged; only the
+        // login form itself now takes an email instead of a username.
         authManager.authenticate(
-            new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword())
+            new UsernamePasswordAuthenticationToken(user.getUsername(), req.getPassword())
         );
-        var userDetails = userDetailsService.loadUserByUsername(req.getUsername());
+        var userDetails = userDetailsService.loadUserByUsername(user.getUsername());
         String token = jwtUtils.generateToken(userDetails);
-        var user = userRepo.findByUsername(req.getUsername()).orElseThrow();
         return new JwtResponse(token, user.getUsername(), user.getRole().name());
     }
 }

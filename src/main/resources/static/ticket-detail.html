@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ticket Detail - HelpDesk</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .ticket-detail-grid { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
+    .meta-row { display: flex; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid var(--gray-200); font-size: 0.9rem; }
+    .meta-label { color: var(--gray-600); font-weight: 500; }
+    .comment-item { padding: 0.9rem 0; border-bottom: 1px solid var(--gray-200); }
+    .comment-author { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.3rem; }
+    .comment-date { color: var(--gray-600); font-size: 0.8rem; margin-left: 0.5rem; }
+    .comment-content { font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
+    .status-select { padding: 0.4rem 0.7rem; border-radius: var(--radius); border: 1px solid var(--gray-200); font-size: 0.85rem; cursor: pointer; }
+    @media (max-width: 768px) { .ticket-detail-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/dashboard.html" class="brand">HelpDesk</a>
+    <div class="navbar-links">
+      <a href="/dashboard.html">Dashboard</a>
+      <a href="/new-ticket.html">New Ticket</a>
+      <a id="admin-link" href="/admin.html" style="display:none">Admin</a>
+      <span id="navbar-username" style="color:var(--gray-600);font-size:0.85rem"></span>
+      <button class="btn btn-outline" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <a href="/dashboard.html" style="color:var(--primary);font-size:0.9rem;text-decoration:none">&larr; Back to Dashboard</a>
+
+    <div id="ticket-detail-grid" class="ticket-detail-grid" style="margin-top:1.5rem">
+      <div>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div id="ticket-header" style="margin-bottom:1rem">
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+              <span id="ticket-id" style="color:var(--gray-600);font-size:0.85rem"></span>
+              <span id="ticket-priority-badge"></span>
+              <span id="ticket-status-badge"></span>
+            </div>
+            <h1 id="ticket-title" style="font-size:1.3rem;font-weight:700;margin-top:0.5rem"></h1>
+          </div>
+          <div id="ticket-description" style="font-size:0.95rem;line-height:1.7;color:var(--gray-800);white-space:pre-wrap"></div>
+        </div>
+
+        <div class="card">
+          <h2 style="font-size:1rem;font-weight:600;margin-bottom:1rem">Comments</h2>
+          <div id="comments-list"></div>
+          <div style="margin-top:1rem">
+            <div class="form-group">
+              <textarea id="comment-input" rows="3" placeholder="Add a comment..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="postComment()">Post Comment</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2 style="font-size:1rem;font-weight:600;margin-bottom:1rem">Ticket Details</h2>
+          <div id="meta-rows"></div>
+
+          <div id="admin-actions" style="display:none;margin-top:1.2rem;border-top:1px solid var(--gray-200);padding-top:1rem">
+            <p style="font-size:0.85rem;font-weight:500;margin-bottom:0.5rem">Update Status</p>
+            <select id="status-select" class="status-select" style="width:100%;margin-bottom:0.75rem" onchange="updateTicketStatus()">
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="RESOLVED">Resolved</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    requireAuth();
+    renderNavbar();
+
+    const params = new URLSearchParams(window.location.search);
+    const ticketId = params.get('id');
+    if (!ticketId) window.location.href = '/dashboard.html';
+
+    const user = getUser();
+    const isAdmin = user.role === 'ADMIN' || user.role === 'TECHNICIAN';
+    let currentTicket = null;
+
+    async function loadTicket() {
+      try {
+        currentTicket = await apiGet(`/tickets/${ticketId}`);
+        if (!currentTicket) return;
+
+        document.getElementById('ticket-id').textContent = `#${currentTicket.id}`;
+        document.getElementById('ticket-title').textContent = currentTicket.title;
+        document.getElementById('ticket-description').textContent = currentTicket.description;
+        document.getElementById('ticket-priority-badge').innerHTML = priorityBadge(currentTicket.priority);
+        document.getElementById('ticket-status-badge').innerHTML = statusBadge(currentTicket.status);
+
+        document.getElementById('meta-rows').innerHTML = `
+          <div class="meta-row"><span class="meta-label">Status</span><span>${statusBadge(currentTicket.status)}</span></div>
+          <div class="meta-row"><span class="meta-label">Priority</span><span>${priorityBadge(currentTicket.priority)}</span></div>
+          <div class="meta-row"><span class="meta-label">Created by</span><span>${escapeHtml(currentTicket.createdBy?.username || '-')}</span></div>
+          <div class="meta-row"><span class="meta-label">Assigned to</span><span>${escapeHtml(currentTicket.assignedTo?.username || 'Unassigned')}</span></div>
+          <div class="meta-row"><span class="meta-label">Created</span><span>${formatDate(currentTicket.createdAt)}</span></div>
+          <div class="meta-row" style="border:none"><span class="meta-label">Updated</span><span>${formatDate(currentTicket.updatedAt)}</span></div>
+        `;
+
+        if (isAdmin) {
+          document.getElementById('admin-actions').style.display = 'block';
+          document.getElementById('status-select').value = currentTicket.status;
+        }
+
+        loadComments();
+      } catch (e) {
+        console.error('Failed to load ticket:', e);
+      }
+    }
+
+    async function loadComments() {
+      try {
+        const comments = await apiGet(`/tickets/${ticketId}/comments`);
+        if (!comments) return;
+        const list = document.getElementById('comments-list');
+        if (comments.length === 0) {
+          list.innerHTML = '<p style="color:var(--gray-600);font-size:0.9rem">No comments yet.</p>';
+          return;
+        }
+        list.innerHTML = comments.map(c => `
+          <div class="comment-item">
+            <div class="comment-author">
+              ${escapeHtml(c.author?.username || 'Unknown')}
+              <span class="comment-date">${formatDate(c.createdAt)}</span>
+            </div>
+            <div class="comment-content">${escapeHtml(c.content)}</div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error('Failed to load comments:', e);
+      }
+    }
+
+    async function postComment() {
+      const content = document.getElementById('comment-input').value.trim();
+      if (!content) return;
+      try {
+        await apiPost(`/tickets/${ticketId}/comments`, { content }, true);
+        document.getElementById('comment-input').value = '';
+        loadComments();
+      } catch (e) {
+        alert('Failed to post comment.');
+      }
+    }
+
+    async function updateTicketStatus() {
+      const status = document.getElementById('status-select').value;
+      try {
+        await apiPatch(`/tickets/${ticketId}/status`, { status });
+        loadTicket();
+      } catch (e) {
+        alert('Failed to update status.');
+      }
+    }
+
+    loadTicket();
+  </script>
+</body>
+</html>

@@ -1,9 +1,8 @@
-const API = 'http://localhost:8080/api';
+const API = 'http://localhost:8082/api';
 
-// ── Auth helpers ─────────────────────────────────────────
-function getToken()    { return localStorage.getItem('token'); }
-function getUser()     { return JSON.parse(localStorage.getItem('user') || '{}'); }
-function isLoggedIn()  { return !!getToken(); }
+function getToken() { return localStorage.getItem('token'); }
+function getUser() { return JSON.parse(localStorage.getItem('user') || '{}'); }
+function isLoggedIn() { return !!getToken(); }
 
 function authHeaders() {
   return {
@@ -22,11 +21,12 @@ function requireAuth() {
   if (!isLoggedIn()) window.location.href = '/login.html';
 }
 
-// ── API calls ────────────────────────────────────────────
 async function apiPost(endpoint, data, auth = false) {
   const headers = auth ? authHeaders() : { 'Content-Type': 'application/json' };
   const res = await fetch(API + endpoint, {
-    method: 'POST', headers, body: JSON.stringify(data)
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data)
   });
   if (!res.ok) {
     const err = await res.text();
@@ -37,7 +37,10 @@ async function apiPost(endpoint, data, auth = false) {
 
 async function apiGet(endpoint) {
   const res = await fetch(API + endpoint, { headers: authHeaders() });
-  if (res.status === 401) { logout(); return; }
+  if (res.status === 401) {
+    logout();
+    return;
+  }
   if (!res.ok) throw new Error('Request failed');
   return res.json();
 }
@@ -48,16 +51,29 @@ async function apiPatch(endpoint, data) {
     headers: authHeaders(),
     body: JSON.stringify(data)
   });
-  if (!res.ok) throw new Error('Request failed');
+  if (!res.ok) {
+    let message = 'Request failed';
+    try {
+      const body = await res.json();
+      if (body && body.error) message = body.error;
+    } catch (_) { /* no JSON body */ }
+    throw new Error(message);
+  }
   return res.json();
 }
 
 async function apiDelete(endpoint) {
   const res = await fetch(API + endpoint, { method: 'DELETE', headers: authHeaders() });
-  if (!res.ok) throw new Error('Request failed');
+  if (!res.ok) {
+    let message = 'Request failed';
+    try {
+      const body = await res.json();
+      if (body && body.error) message = body.error;
+    } catch (_) { /* no JSON body, e.g. plain 404/405 */ }
+    throw new Error(message);
+  }
 }
 
-// ── UI helpers ───────────────────────────────────────────
 function showAlert(id, message, type = 'error') {
   const el = document.getElementById(id);
   if (!el) return;
@@ -67,26 +83,40 @@ function showAlert(id, message, type = 'error') {
   setTimeout(() => el.style.display = 'none', 4000);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
 function statusBadge(status) {
-  return `<span class="badge badge-${status.toLowerCase()}">${status.replace('_', ' ')}</span>`;
+  if (!status) return '';
+  return `<span class="badge badge-${status.toLowerCase()}">${escapeHtml(status.replace('_', ' '))}</span>`;
 }
 
 function priorityBadge(priority) {
-  return `<span class="badge badge-${priority.toLowerCase()}">${priority}</span>`;
+  if (!priority) return '';
+  return `<span class="badge badge-${priority.toLowerCase()}">${escapeHtml(priority)}</span>`;
 }
 
 function formatDate(dateStr) {
+  if (!dateStr) return '-';
   return new Date(dateStr).toLocaleDateString('en-ZA', {
-    day: '2-digit', month: 'short', year: 'numeric'
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
   });
 }
 
-// ── Navbar ───────────────────────────────────────────────
-function renderNavbar(activePage) {
+function renderNavbar() {
   const user = getUser();
   const isAdmin = user.role === 'ADMIN' || user.role === 'TECHNICIAN';
-  document.getElementById('navbar-username').textContent = user.username || '';
-  if (isAdmin && document.getElementById('admin-link')) {
-    document.getElementById('admin-link').style.display = 'inline';
-  }
+  const nameEl = document.getElementById('navbar-username');
+  if (nameEl) nameEl.textContent = user.username || '';
+  const adminLink = document.getElementById('admin-link');
+  if (isAdmin && adminLink) adminLink.style.display = 'inline';
 }

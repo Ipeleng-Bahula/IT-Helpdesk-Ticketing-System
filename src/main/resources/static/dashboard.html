@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard — HelpDesk</title>
+  <title>Dashboard - HelpDesk</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <nav class="navbar">
-    <a href="/dashboard.html" class="brand">🎫 HelpDesk</a>
+    <a href="/dashboard.html" class="brand">HelpDesk</a>
     <div class="navbar-links">
       <a href="/dashboard.html">Dashboard</a>
-      <a href="/tickets.html">My Tickets</a>
       <a href="/new-ticket.html">New Ticket</a>
       <a id="admin-link" href="/admin.html" style="display:none">Admin</a>
       <span id="navbar-username" style="color:var(--gray-600);font-size:0.85rem"></span>
@@ -24,26 +23,26 @@
 
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-number" id="total-tickets">—</div>
+        <div class="stat-number" id="total-tickets">-</div>
         <div class="stat-label">Total Tickets</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number" id="open-tickets">—</div>
+        <div class="stat-number" id="open-tickets">-</div>
         <div class="stat-label">Open</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number" id="inprogress-tickets">—</div>
+        <div class="stat-number" id="inprogress-tickets">-</div>
         <div class="stat-label">In Progress</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number" id="resolved-tickets">—</div>
+        <div class="stat-number" id="resolved-tickets">-</div>
         <div class="stat-label">Resolved</div>
       </div>
     </div>
 
     <div class="card">
       <div class="page-header" style="margin-bottom:1rem">
-        <h2 style="font-size:1.1rem;font-weight:600">Recent Tickets</h2>
+        <h2 style="font-size:1.1rem;font-weight:600">My Recent Tickets</h2>
         <a href="/new-ticket.html" class="btn btn-primary">+ New Ticket</a>
       </div>
       <table class="ticket-table">
@@ -67,25 +66,23 @@
     async function loadDashboard() {
       try {
         const tickets = await apiGet('/tickets/my');
-        const total = tickets.length;
-        const open  = tickets.filter(t => t.status === 'OPEN').length;
-        const inp   = tickets.filter(t => t.status === 'IN_PROGRESS').length;
-        const res   = tickets.filter(t => t.status === 'RESOLVED').length;
+        if (!tickets) return;
 
-        document.getElementById('total-tickets').textContent    = total;
-        document.getElementById('open-tickets').textContent     = open;
-        document.getElementById('inprogress-tickets').textContent = inp;
-        document.getElementById('resolved-tickets').textContent  = res;
+        document.getElementById('total-tickets').textContent = tickets.length;
+        document.getElementById('open-tickets').textContent = tickets.filter(t => t.status === 'OPEN').length;
+        document.getElementById('inprogress-tickets').textContent = tickets.filter(t => t.status === 'IN_PROGRESS').length;
+        document.getElementById('resolved-tickets').textContent = tickets.filter(t => t.status === 'RESOLVED').length;
 
         const tbody = document.getElementById('ticket-tbody');
         if (tickets.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--gray-600);padding:2rem">No tickets yet. <a href="/new-ticket.html">Create one!</a></td></tr>`;
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-600);padding:2rem">No tickets yet. <a href="/new-ticket.html">Create one!</a></td></tr>';
           return;
         }
+
         tbody.innerHTML = tickets.slice(0, 10).map(t => `
           <tr>
             <td>#${t.id}</td>
-            <td>${t.title}</td>
+            <td>${escapeHtml(t.title)}</td>
             <td>${priorityBadge(t.priority)}</td>
             <td>${statusBadge(t.status)}</td>
             <td>${formatDate(t.createdAt)}</td>
@@ -93,7 +90,7 @@
           </tr>
         `).join('');
       } catch (e) {
-        console.error(e);
+        console.error('Failed to load dashboard:', e);
       }
     }
 

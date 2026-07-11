@@ -84,6 +84,21 @@ body {
   box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
 
+.password-field { position: relative; }
+.password-field input { padding-right: 2.4rem; }
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.7rem;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: var(--gray-600);
+  font-size: 1.05rem;
+  user-select: none;
+  line-height: 1;
+}
+.password-toggle:hover { color: var(--primary); }
+
 .badge {
   display: inline-block;
   padding: 0.2rem 0.6rem;
